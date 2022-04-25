@@ -1,0 +1,133 @@
+#!/bin/sh
+export POSIXLY_CORRECT=yes
+
+# -*- DEFAULT SETTINGS -*-
+NORMALIZE=false
+DIR=.
+FILE_ERE="//////////"
+HELP="Usage: dirgraph [-i FILE_ERE] [-n] [DIR]
+                    -i   ignore FILE_ERE, can't be root directory
+                    -n   output normalization
+                    DIR  directory to browse [default: ./]"
+
+# -*- FUNCTION FOR PRINTING HASHES -*-
+print_hashes() {
+    if [ "$1" -eq 0 ]; then
+        printf "\n"
+        return
+    else
+        for i in $(seq "$1")
+        do
+            printf "#"
+        done
+        printf "\n"
+    fi
+}
+
+# -*- FUNCTION TO EDIT MAX POSSIBLE CHAR WIDTH
+edit_char_width() {
+    arg1=$1
+
+    MAX=0
+    for i in $(seq 0 8)
+        do  
+            eval CURRENT="\$HASH_NUMBER$i"
+            if [ "$CURRENT" -eq 0 ]; then
+                eval HASH_NUMBER"$i"=0
+            else
+                if [ "$CURRENT" -gt $MAX ]; then
+                    MAX=$CURRENT
+                fi
+            fi
+        done
+
+    if [ "$MAX" -gt "$arg1" ]; then
+        for i in $(seq 0 8)
+            do
+                eval CURRENT="\$HASH_NUMBER$i"
+                eval HASH_NUMBER"$i"=$((CURRENT * (arg1-12) / MAX))
+            done
+    fi
+}
+
+# -*- FLAGS SWITCH -*-
+while getopts :i:n options
+    do case "$options" in
+        i) FILE_ERE="$OPTARG";;
+        n) NORMALIZE=true;;
+        *) echo "$HELP"
+           exit 1;;
+    esac
+done
+
+# -*- IF DIR PARAMETER IS PROVIDED, AND THE DIR EXIST, CHANGE DIR VARIABLE, EXECUTE ERROR OTHERWISE -*-
+shift $((OPTIND - 1))
+
+if [ "$#" -eq 1 ]; then
+    if [ -d "$*" ]; then
+        DIR="$*"
+    else 
+        echo "Error: Directory does not exist."
+        exit 1;
+    fi
+fi
+
+# -*- NORMALZATION -*-
+HASH_NUMBER0=$(find "$DIR" -type f -size -100c | grep -E -vc "$FILE_ERE");
+HASH_NUMBER1=$(find "$DIR" -type f -size +99c -size -1024c | grep -E -vc "$FILE_ERE");
+HASH_NUMBER2=$(find "$DIR" -type f -size +1023c -size -10240c | grep -E -vc "$FILE_ERE");
+HASH_NUMBER3=$(find "$DIR" -type f -size +10239c -size -102400c | grep -E -vc "$FILE_ERE");
+HASH_NUMBER4=$(find "$DIR" -type f -size +102399c -size -1048576c | grep -E -vc "$FILE_ERE");
+HASH_NUMBER5=$(find "$DIR" -type f -size +1048575c -size -10485760c | grep -E -vc "$FILE_ERE");
+HASH_NUMBER6=$(find "$DIR" -type f -size +10485759c -size -104857600c | grep -E -vc "$FILE_ERE");
+HASH_NUMBER7=$(find "$DIR" -type f -size +104857599c  -size -1073741824c | grep -E -vc "$FILE_ERE");
+HASH_NUMBER8=$(find "$DIR" -type f -size +1073741823c | grep -E -vc "$FILE_ERE");
+
+# -*- SET MAX CHAR POSSIBLE TO COL WIDTH IF NORMALIZE IS ON, TO 79 IF STDOUT, INF OTHERWISE -*-
+test -t 1
+
+if [ "$NORMALIZE" = true ]; then
+    MAX_CHAR=$(tput cols);
+    edit_char_width "$MAX_CHAR"
+else 
+    if [ $# -eq 1 ]; then
+        MAX_CHAR=79
+        edit_char_width $MAX_CHAR
+    fi
+fi
+
+# -*- PRINT INFO AND HISTOGRAM -*-
+echo "Root directory: $DIR"
+echo "Directories:" "$(find "$DIR" -type d | grep -E -vc "$FILE_ERE")"
+echo "All files:" "$(find "$DIR" -type f | grep -E -vc "$FILE_ERE")"
+
+echo "File size histogram:"
+
+printf "  <100 B  : "
+print_hashes "$HASH_NUMBER0"
+
+printf "  <1 KiB  : " 
+print_hashes "$HASH_NUMBER1"
+
+printf "  <10 KiB : " 
+print_hashes "$HASH_NUMBER2"
+
+printf "  <100 KiB: " 
+print_hashes "$HASH_NUMBER3"
+
+printf "  <1 MiB  : " 
+print_hashes "$HASH_NUMBER4"
+
+printf "  <10 MiB : " 
+print_hashes "$HASH_NUMBER5"
+
+printf "  <100 MiB: " 
+print_hashes "$HASH_NUMBER6"
+
+printf "  <1 GiB  : " 
+print_hashes "$HASH_NUMBER7"
+
+printf "  >=1 GiB : " 
+print_hashes "$HASH_NUMBER8"
+
+exit 0
